@@ -2,7 +2,9 @@ version: "3.5"
 
 services:
   mcp:
-    image: python:3.11-slim
+    # image: python:3.11-slim
+    build:
+      context: .
     container_name: mcpserver
     working_dir: /app
     # volumes:
