@@ -133,6 +133,7 @@ async def chat(req: ChatRequest):
     try:
         res = await call_openai(payload)
         data = res.json()
+        logger.info(f"Dữ liệu nhận từ Odoo: {data}")
 
         if res.status_code != 200:
             logger.error("OpenAI Error: %s", data)
