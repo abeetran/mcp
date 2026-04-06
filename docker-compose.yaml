@@ -17,6 +17,7 @@ services:
     networks:
       - coolify
     restart: unless-stopped
-  networks:
-    coolify:      # Khai báo mạng ở cấp độ root
-      external: true
+
+networks:
+  coolify:      # Khai báo mạng ở cấp độ root
+    external: true
