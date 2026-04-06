@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import os
 import httpx
 import logging
+import base64 
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -35,12 +36,18 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # =========================
-# MODELS
+# MODELS 
 # =========================
+
+class FileItem(BaseModel):
+    name: str
+    type: str
+    data: str
 
 class ChatRequest(BaseModel):
     message: str | None = None
-    question: str | None = None   # backward compatibility for old clients
+    question: str | None = None   
+    files: list[FileItem] | None = None # <-- NHẬN MẢNG FILE TỪ ODOO
 
 class ChatResponse(BaseModel):
     reply: str
@@ -73,7 +80,7 @@ async def call_openai(payload: dict):
     return r
 
 # =========================
-# CHAT API
+# CHAT API 
 # =========================
 
 @app.post("/chat", response_model=ChatResponse)
@@ -82,19 +89,45 @@ async def chat(req: ChatRequest):
     if not OPENAI_API_KEY:
         raise HTTPException(500, "OPENAI_API_KEY is not configured")
 
-    # Accept both message & question
-    prompt = req.message or req.question
+    prompt_text = req.message or req.question or ""
 
-    if not prompt:
-        raise HTTPException(400, "Missing field: message or question")
+    if not prompt_text and not req.files:
+        raise HTTPException(400, "Missing field: message or files")
+
+    text_content = prompt_text
+    image_contents = []
+    has_images = False
+
+    if req.files:
+        for f in req.files:
+            if f.type.startswith("image/"):
+                has_images = True
+                image_contents.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{f.type};base64,{f.data}"}
+                })
+            elif f.type in ["text/csv", "text/plain"] or f.name.endswith(('.csv', '.txt')):
+                try:
+                    # Dịch file Base64 ra chữ Text và ghép thẳng vào câu hỏi
+                    decoded_text = base64.b64decode(f.data).decode('utf-8')
+                    text_content += f"\n\n--- Dữ liệu từ file tài liệu: {f.name} ---\n{decoded_text}\n--- Hết file ---"
+                except Exception as e:
+                    logger.error("Lỗi đọc file: %s", str(e))
+            else:
+                text_content += f"\n\n[Hệ thống: Có đính kèm file {f.name} nhưng định dạng này AI chưa hỗ trợ đọc trực tiếp]"
+
+    if has_images:
+        user_content = [{"type": "text", "text": text_content}] + image_contents
+    else:
+        user_content = text_content
 
     payload = {
         "model": OPENAI_MODEL,
         "messages": [
-            {"role": "system", "content": "You are a professional Odoo ERP AI assistant."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": "You are a friendly and versatile AI assistant. You can chat about any topic, answer general knowledge questions, and also help users operate their Odoo ERP system."},
+            {"role": "user", "content": user_content}
         ],
-        "temperature": 0.3
+        "temperature": 0.5 
     }
 
     try:
