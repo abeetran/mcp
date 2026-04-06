@@ -5,7 +5,7 @@ services:
     # image: python:3.11-slim
     build:
       context: ./mcp
-    container_name: mcp_server
+    container_name: mcpserver
     working_dir: /app
     # volumes:
     #   - ./mcp:/app
