@@ -261,11 +261,12 @@ async def call_openai(payload: dict):
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        r = await client.post(
+    async with httpx.AsyncClient() as client:
+        res = await client.post(
             "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload
+            headers,
+            json=payload,
+            timeout=60
         )
     return r
 
@@ -388,5 +389,7 @@ async def chat(req: ChatRequest):
         logger.error("=== ERROR END ===")
         return JSONResponse(
             status_code=500,
-            content={"reply": f"Internal Error: {str(e)}"}
+            content={
+                "debug": res.text if 'res' in locals() else "no response",
+            }
         )
