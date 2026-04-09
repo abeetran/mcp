@@ -271,7 +271,6 @@ async def call_openai(payload: dict):
 # CHAT API
 # =========================
 
-
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
 
@@ -279,58 +278,95 @@ async def chat(req: ChatRequest):
         raise HTTPException(500, "OPENAI_API_KEY is not configured")
 
     prompt_text = req.message or req.question or ""
-    current_files = req.files if req.files is not None else []
+    current_files = req.files or []
 
     if not prompt_text and not current_files:
         raise HTTPException(400, "Missing field: message or files")
 
-    text_content = prompt_text
-    image_contents = []
-    has_images = False
+    text_content = prompt_text or ""
+    user_content = []
 
+    # ===== XỬ LÝ FILE =====
     for f in current_files:
-        if f.type.startswith("image/"):
-            has_images = True
-            image_contents.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{f.type};base64,{f.data}"}
-            })
-        else:
-            extracted = extract_text_file_content(f)
-            if extracted:
-                text_content += extracted
+        try:
+            if f.type and f.type.startswith("image/"):
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{f.type};base64,{f.data}"
+                    }
+                })
             else:
-                text_content += f"\n\n[Hệ thống: File {f.name} ({f.type or 'unknown'}) được đính kèm. Nếu có thể, hãy trả lời dựa trên tên file và nội dung đã có.]"
+                extracted = extract_text_file_content(f)
+                if extracted:
+                    text_content += f"\n{extracted}"
+                else:
+                    text_content += f"\n\n[File {f.name} ({f.type or 'unknown'}) attached]"
+        except Exception as e:
+            text_content += f"\n\n[Error reading file {f.name}]"
 
-    if has_images:
-        user_content = [
-            {"type": "text", "text": text_content}
-        ] + image_contents
-    else:
-        user_content = text_content
+    # ===== LUÔN ADD TEXT CUỐI =====
+    if text_content:
+        user_content.insert(0, {
+            "type": "text",
+            "text": text_content.strip()
+        })
+
+    # ===== FIX QUAN TRỌNG: luôn là array =====
+    if not user_content:
+        user_content = [{"type": "text", "text": "Hello"}]
 
     payload = {
-        "model": OPENAI_MODEL,
+        "model": OPENAI_MODEL,  # ví dụ: gpt-4o-mini
         "messages": [
-            {"role": "system", "content": "You are a friendly and versatile AI assistant. You can chat about any topic, answer general knowledge questions, and also help users operate their Odoo ERP system."},
-            {"role": "user", "content": user_content}
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "You are a friendly and versatile AI assistant. You can chat about any topic, answer general knowledge questions, and also help users operate their Odoo ERP system."
+                    }
+                ]
+            },
+            {
+                "role": "user",
+                "content": user_content
+            }
         ],
         "temperature": 0.5
     }
 
     try:
         res = await call_openai(payload)
-        data = res.json()
+
+        # ===== DEBUG =====
+        try:
+            data = res.json()
+        except Exception:
+            logger.error("Invalid JSON response: %s", res.text)
+            return JSONResponse(
+                status_code=502,
+                content={"reply": "Invalid response from OpenAI"}
+            )
 
         if res.status_code != 200:
             logger.error("OpenAI Error: %s", data)
             return JSONResponse(
                 status_code=502,
-                content={"reply": data.get("error", {}).get(
-                    "message", "OpenAI API Error")}
+                content={
+                    "reply": data.get("error", {}).get(
+                        "message", "OpenAI API Error"
+                    )
+                }
             )
 
-        reply = data["choices"][0]["message"]["content"]
+        # ===== FIX SAFE PARSE =====
+        reply = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        )
+
         return {"reply": reply}
 
     except httpx.RequestError as e:
