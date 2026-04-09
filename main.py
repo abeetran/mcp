@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
 import traceback
 import json
+from typing import Optional, List
 
 try:
     import PyPDF2
@@ -71,10 +72,14 @@ class FileItem(BaseModel):
     data: str
 
 
+# class ChatRequest(BaseModel):
+#     message: str | None = None
+#     question: str | None = None
+#     files: list[FileItem] | None = None  # <-- NHẬN MẢNG FILE TỪ ODOO
 class ChatRequest(BaseModel):
-    message: str | None = None
-    question: str | None = None
-    files: list[FileItem] | None = None  # <-- NHẬN MẢNG FILE TỪ ODOO
+    message: Optional[str] = None
+    question: Optional[str] = None
+    files: Optional[List] = None
 
 
 class ChatResponse(BaseModel):
@@ -280,10 +285,15 @@ async def chat(req: ChatRequest):
     if not OPENAI_API_KEY:
         raise HTTPException(500, "OPENAI_API_KEY is not configured")
 
-    prompt_text = req.message or req.question or ""
+    # prompt_text = req.message or req.question or ""
     current_files = req.files or []
+    prompt_text = ""
+    if req.message and req.message.strip():
+        prompt_text = req.message.strip()
+    elif req.question and req.question.strip():
+        prompt_text = req.question.strip()
 
-    if not prompt_text and not current_files:
+    if (not prompt_text or not prompt_text.strip()) and not current_files:
         raise HTTPException(400, "Missing field: message or files")
 
     text_content = prompt_text or ""
