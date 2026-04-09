@@ -4,3 +4,7 @@ python-dotenv
 openai
 requests
 tenacity
+PyPDF2
+openpyxl
+xlrd
+python-docx
