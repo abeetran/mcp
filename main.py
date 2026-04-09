@@ -268,12 +268,12 @@ async def call_openai(payload: dict):
 
     async with httpx.AsyncClient() as client:
         res = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers,
-            json=payload,
-            timeout=60
-        )
-    return r
+        "https://api.openai.com/v1/chat/completions",
+        headers=headers,
+        json=payload,   # ✅ ĐÚNG
+        timeout=60
+    )
+    return res
 
 # =========================
 # CHAT API
