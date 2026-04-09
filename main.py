@@ -11,6 +11,8 @@ import logging
 import base64
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
+import traceback
+import json
 
 try:
     import PyPDF2
@@ -337,7 +339,11 @@ async def chat(req: ChatRequest):
     }
 
     try:
+        logger.info("PAYLOAD: %s", json.dumps(payload)[:2000])
         res = await call_openai(payload)
+
+        logger.info("STATUS: %s", res.status_code)
+        logger.info("RESPONSE TEXT: %s", res.text[:2000])
 
         # ===== DEBUG =====
         try:
@@ -377,7 +383,9 @@ async def chat(req: ChatRequest):
         )
 
     except Exception as e:
-        logger.exception("Unexpected error")
+        logger.error("=== ERROR START ===")
+        logger.error(traceback.format_exc())
+        logger.error("=== ERROR END ===")
         return JSONResponse(
             status_code=500,
             content={"reply": f"Internal Error: {str(e)}"}
