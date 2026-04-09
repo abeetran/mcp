@@ -384,12 +384,6 @@ async def chat(req: ChatRequest):
         )
 
     except Exception as e:
-        logger.error("=== ERROR START ===")
-        logger.error(traceback.format_exc())
-        logger.error("=== ERROR END ===")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "debug": res.text if 'res' in locals() else "no response",
-            }
-        )
+        print("ERROR:", str(e))
+        traceback.print_exc()  # 🔥 QUAN TRỌNG
+        raise HTTPException(500, str(e))
