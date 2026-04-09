@@ -268,11 +268,11 @@ async def call_openai(payload: dict):
 
     async with httpx.AsyncClient() as client:
         res = await client.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers=headers,
-        json=payload,   # ✅ ĐÚNG
-        timeout=60
-    )
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,   # ✅ ĐÚNG
+            timeout=60
+        )
     return res
 
 # =========================
@@ -285,15 +285,10 @@ async def chat(req: ChatRequest):
     if not OPENAI_API_KEY:
         raise HTTPException(500, "OPENAI_API_KEY is not configured")
 
-    # prompt_text = req.message or req.question or ""
+    prompt_text = (req.message or req.question or "").strip()
     current_files = req.files or []
-    prompt_text = ""
-    if req.message and req.message.strip():
-        prompt_text = req.message.strip()
-    elif req.question and req.question.strip():
-        prompt_text = req.question.strip()
 
-    if (not prompt_text or not prompt_text.strip()) and not current_files:
+    if not prompt_text and not current_files:
         raise HTTPException(400, "Missing field: message or files")
 
     text_content = prompt_text or ""
